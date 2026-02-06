@@ -1,13 +1,18 @@
 [build-system]
-requires = ["flit_core >= 3.4"]
-build-backend = "flit_core.buildapi"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "i2rt"
 version = "0.0.1"
+description = "I2RT YAM Repo"
 readme = "README.md"
 requires-python = ">=3.10"
-dynamic = ["description"]
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License"
+]
 dependencies = [
     "click<8.2.0",
     "dm-env==1.6",
@@ -24,72 +29,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest==8.4.0",
-]
+dev = ["pytest==8.4.0"]
 
-[tool.flit.module]
-name = "i2rt"
+[tool.setuptools]
+# This replaces the need for find_packages() in setup.py
+packages = {find = {}}
 
-[tool.ruff]
-line-length = 119 # Set the max line length to 119 characters.
-lint.select = [
-    "ANN", # Annotations.
-    "B",   # bugbear rules
-    # "D",   # docstring rules.
-    "E",   # pycodestyle errors.
-    "F",   # Pyflakes rules.
-    "I",   # Import sorting.
-    "PLC", # Pylint convention warnings.
-    "PLE", # Pylint errors.
-    "PLR", # Pylint refactor recommendations.
-    "PLW", # Pylint warnings.
-    "RUF"  # Ruff rules.
-]
-lint.ignore = [
-    "ANN101",
-    "ANN102",
-    "ANN204",
-    "ANN401",
-    "E741", # Ambiguous variable name. (l, O, or I)
-    "F841",
-    "E402",
-    "E501",
-    "PLR1722",
-    "PLR2004",  # Magic value used in comparison.
-    "PLR0915",  # Too many statements.
-    "PLR0913",  # Too many arguments.
-    "PLC0414",  # Import alias does not rename variable. (this is used for exporting names)
-    "PLC1901",  # Use falsey strings.
-    "PLR0911",  # Too many return statements.
-    "PLR0912",  # Too many branches.
-    "PLW0603",  # Global statement updates are discouraged.
-    "PLW2901",  # For loop variable overwritten.
-    "RUF005",
-    "RUF009",
-    "RUF012"
-]
-lint.extend-select = ["E501"]
-lint.exclude = ["*.ipynb"]
+# Keep your [tool.ruff], [tool.mypy], etc., exactly as they were!
 
-[tool.ruff.format]
-docstring-code-format = true
-skip-magic-trailing-comma = false
-
-[tool.mypy]
-python_version = "3.12"
-ignore_missing_imports = true
-warn_unused_configs = true
-exclude = ["scripts/"]
-
-[tool.coverage.report]
-exclude_also = [
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
-    "def __repr__",
-]
-omit = [
-    "*exceptions.py",
-]
+[tool.setuptools_scm]
+version_scheme = "post-release"
+write_to = "i2rt/_version.py"
