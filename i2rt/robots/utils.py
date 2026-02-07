@@ -275,7 +275,7 @@ class GripperForceLimiter:
         history_ts = np.array(history_ts)
         history_effort = np.array(history_effort)
         valid_idx = history_ts > time.time() - self.average_torque_window
-        average_effort = np.abs(np.mean(history_effort[valid_idx]))
+        average_effort = np.abs(np.mean(history_effort[valid_idx])) if np.any(valid_idx) else 0.0
 
         if self.debug:
             print(f"average_effort: {average_effort}")
