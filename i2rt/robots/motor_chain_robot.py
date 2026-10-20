@@ -108,6 +108,10 @@ class MotorChainRobot(Robot):
             if gripper_limits is None and enable_gripper_calibration:
                 logger = logging.getLogger(__name__)
                 logger.info("Auto-detecting gripper limits...")
+                linear_gripper = gripper_type in (
+                    GripperType.LINEAR_3507,
+                    GripperType.LINEAR_4310,
+                )
                 detected_limits = detect_gripper_limits(
                     motor_chain=motor_chain,
                     gripper_index=gripper_index,
@@ -115,6 +119,7 @@ class MotorChainRobot(Robot):
                     max_duration=test_duration,
                     position_threshold=position_threshold,
                     check_interval=check_interval,
+                    motor_stroke=6.57 if linear_gripper else None,
                 )
                 gripper_limits = np.array(detected_limits)
                 logger.info(f"Gripper limits auto-detected: {gripper_limits}")

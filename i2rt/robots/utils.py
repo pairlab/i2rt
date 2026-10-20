@@ -524,6 +524,7 @@ def detect_gripper_limits(
     max_duration: float = 2.0,
     position_threshold: float = 0.01,
     check_interval: float = 0.1,
+    motor_stroke: Optional[float] = None,
 ) -> List[float]:
     """
     Detect gripper limits by applying test torques and monitoring position changes.
@@ -535,14 +536,19 @@ def detect_gripper_limits(
         max_duration: Maximum test duration for each direction (s)
         position_threshold: Minimum position change to consider motor still moving (rad)
         check_interval: Time interval between checks (s)
+        motor_stroke: Known full motor stroke in radians. When provided, only the
+            open endpoint is contacted and the closed endpoint is inferred, avoiding
+            contact with the gripper's mechanical closed stop.
 
     Returns:
         List of detected limits [limit1, limit2]
     """
     logger = logging.getLogger(__name__)
     positions = []
-    num_motors = len(motor_chain.motor_list)
-    zero_torques = np.zeros(num_motors)
+    if motor_stroke is not None and (
+        not np.isfinite(motor_stroke) or motor_stroke <= 0
+    ):
+        raise ValueError("motor_stroke must be finite and positive")
 
     # Get motor direction for the gripper
     motor_direction = motor_chain.motor_direction[gripper_index]
@@ -554,42 +560,57 @@ def detect_gripper_limits(
     positions.append(initial_pos)
     logger.info(f"Gripper calibration starting from position: {initial_pos:.4f}")
 
-    # Test both directions
-    for direction in [1, -1]:
+    # With a known stroke, probe only the open endpoint. Positive motor direction
+    # means the closed endpoint has the larger raw position (and vice versa).
+    directions = (
+        [-int(np.sign(motor_direction))] if motor_stroke is not None else [1, -1]
+    )
+    for direction in directions:
         logger.info(f"Testing gripper direction: {direction}")
-        test_torques = init_torque
+        test_torques = init_torque.copy()
         test_torques[gripper_index] = direction * test_torque
 
         start_time = time.time()
         last_pos = None
         position_stable_count = 0
 
-        while time.time() - start_time < max_duration:
-            motor_chain.set_commands(torques=test_torques)
-            time.sleep(check_interval)
+        try:
+            while time.time() - start_time < max_duration:
+                motor_chain.set_commands(torques=test_torques)
+                time.sleep(check_interval)
 
-            states = motor_chain.read_states()
-            current_pos = states[gripper_index].pos
-            positions.append(current_pos)
+                states = motor_chain.read_states()
+                current_pos = states[gripper_index].pos
+                positions.append(current_pos)
 
-            # Check if position has stopped changing (gripper hit limit)
-            if last_pos is not None:
-                pos_change = abs(current_pos - last_pos)
-                if pos_change < position_threshold:
-                    position_stable_count += 1
-                else:
-                    position_stable_count = 0
+                # Check if position has stopped changing (gripper hit limit)
+                if last_pos is not None:
+                    pos_change = abs(current_pos - last_pos)
+                    if pos_change < position_threshold:
+                        position_stable_count += 1
+                    else:
+                        position_stable_count = 0
 
-                # Check if gripper has hit limit (position stable)
-                if position_stable_count >= 3:
-                    logger.info(f"Gripper limit detected: pos={current_pos:.4f}")
-                    break
+                    if position_stable_count >= 3:
+                        logger.info(f"Gripper limit detected: pos={current_pos:.4f}")
+                        break
 
-            last_pos = current_pos
-
+                last_pos = current_pos
+        finally:
+            # Release endpoint-seeking torque on both success and read failure.
+            rest_torques = init_torque.copy()
+            rest_torques[gripper_index] = 0.0
+            motor_chain.set_commands(torques=rest_torques)
         time.sleep(0.3)
 
     # Calculate detected limits
+    if motor_stroke is not None:
+        open_pos = min(positions) if motor_direction > 0 else max(positions)
+        closed_pos = open_pos + np.sign(motor_direction) * motor_stroke
+        detected_limits = [closed_pos, open_pos]
+        logger.info(f"Inferred closed limit without contact: pos={closed_pos:.4f}")
+        return detected_limits
+
     min_pos = min(positions)
     max_pos = max(positions)
 
